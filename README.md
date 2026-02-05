@@ -1,16 +1,62 @@
-# React + Vite
+# AetherBoard ⌨️✨
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**The Premium Aesthetic Keyboard Tester**
 
-Currently, two official plugins are available:
+AetherBoard is a next-generation keyboard testing application designed for enthusiasts. It moves beyond simple utility to provide a satisfying, immersive testing experience with procedural audio feedback and a high-fidelity visual design.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+![AetherBoard Header](https://via.placeholder.com/1200x600/1e293b/38bdf8?text=AetherBoard+Interface) 
+*(Add your actual screenshot here)*
 
-## React Compiler
+## Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 🔊 Procedural Audio Engine
+Every key press is synthesized in real-time using the Web Audio API.
+-   **Unique Signature**: Each key has a deterministic, unique pitch offset.
+-   **Profiles**: Switch between "Clicky" (High-pitched, crisp) and "Linear" (Deep, thocky) sound profiles.
 
-## Expanding the ESLint configuration
+### 🎨 Visual Excellence
+-   **Themes**: 7+ professionally curated themes including Neon, Retro, Glass, Ocean, and Sunset.
+-   **Glassmorphism**: Built with modern CSS transparency and blur filters.
+-   **Typography**: Features the custom "Geom" typeface for a futuristic aesthetic.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 📊 Smart Reporting
+-   **History Timeline**: Tracks your testing sessions locally.
+-   **PDF Certification**: Generate professional PDF reports of your keyboard tests to document new builds or sell trades.
+-   **Detailed Analysis**: See exact pass rates and lists of missing/dead keys.
+
+## Tech Stack
+-   **Framework**: React 18 + Vite
+-   **Styling**: Tailwind CSS + Phosphor Icons
+-   **Audio**: Web Audio API (No samples, pure synthesis)
+-   **Export**: html2canvas + jsPDF
+
+## Local Development
+
+### Prerequisites
+-   Node.js 18+
+-   npm or pnpm
+
+### Setup
+```bash
+# 1. Clone the repository
+git clone https://github.com/theezemmuo/AetherBoard.git
+cd AetherBoard
+
+# 2. Install dependencies
+npm install
+
+# 3. Start the dev server
+npm run dev
+```
+
+### Building for Production
+```bash
+npm run build
+```
+
+## Privacy
+AetherBoard runs entirely client-side. No keystroke data is ever sent to a server.
+
+---
+
+*Created for keyboard enthusiasts who demand better tools.*
