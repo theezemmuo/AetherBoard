@@ -62,7 +62,7 @@ function KeyboardTester() {
       </div>
 
       <div className="fixed bottom-6 text-slate-600 text-xs font-mono">
-        AetherBoard v1.0 • Press any key to test including system keys
+        Aetherboard v1.0 • Press any key to test including system keys
       </div>
     </div>
   );

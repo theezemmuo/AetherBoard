@@ -91,7 +91,7 @@ export function TestReportModal({ onClose }) {
             ? selectedReport.missing.map(k => k.label || k.code).join(', ')
             : 'None';
 
-        const text = `AetherBoard Test Report\nDate: ${selectedReport.date}\nOS: ${os.toUpperCase()}\nScore: ${selectedReport.score} (${selectedReport.percentage}%)\n\nMissing Keys:\n${missingStr}`;
+        const text = `Aetherboard Test Report\nDate: ${selectedReport.date}\nOS: ${os.toUpperCase()}\nScore: ${selectedReport.score} (${selectedReport.percentage}%)\n\nMissing Keys:\n${missingStr}`;
 
         navigator.clipboard.writeText(text);
         setCopied(true);
