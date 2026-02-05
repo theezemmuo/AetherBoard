@@ -1,0 +1,141 @@
+@import "tailwindcss";
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-skin-fill: var(--bg-main);
+  --color-skin-card: var(--bg-card);
+  --color-skin-border: var(--border-main);
+  --color-skin-text: var(--text-main);
+  --color-skin-muted: var(--text-muted);
+  --color-skin-key-bg: var(--key-bg);
+  --color-skin-key-text: var(--key-text);
+  --color-skin-key-active: var(--key-active);
+  --color-skin-key-active-text: var(--key-active-text);
+}
+
+:root {
+  /* Default Dark (Phantom/Slate) - Converted to Hex/RGBA for html2canvas compatibility */
+  --bg-main: #1e293b;
+  --bg-card: rgba(30, 41, 59, 0.5);
+  --border-main: rgba(51, 65, 85, 0.5);
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --key-bg: #334155;
+  --key-text: #cbd5e1;
+  --key-active: #3b82f6;
+  --key-active-text: #fff;
+}
+
+[data-theme='light'] {
+  /* Light Mode - Converted to Hex/RGBA */
+  --bg-main: #f8fafc;
+  --bg-card: rgba(255, 255, 255, 0.5);
+  --border-main: #e2e8f0;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --key-bg: #fff;
+  --key-text: #475569;
+  --key-active: #3b82f6;
+  --key-active-text: #fff;
+}
+
+[data-theme='neon'] {
+  /* Cyberpunk Neon */
+  --bg-main: #050505;
+  --bg-card: rgba(20, 20, 20, 0.8);
+  --border-main: #ff00ff;
+  --text-main: #00ffff;
+  --text-muted: #ff00ff;
+  --key-bg: #111;
+  --key-text: #00ffff;
+  --key-active: #ff00ff;
+  --key-active-text: #fff;
+}
+
+[data-theme='retro'] {
+  /* Retro Beige (Commodore/IBM) */
+  --bg-main: #e0d8c0;
+  --bg-card: #d0c8b0;
+  --border-main: #8b7d6b;
+  --text-main: #4a3b2a;
+  --text-muted: #8b7d6b;
+  --key-bg: #f0e6d2;
+  --key-text: #4a3b2a;
+  --key-active: #d2691e;
+  --key-active-text: #fff;
+}
+
+[data-theme='glass'] {
+  /* Ultra Glass */
+  --bg-main: #000000;
+  --bg-card: rgba(255, 255, 255, 0.05);
+  --border-main: rgba(255, 255, 255, 0.2);
+  --text-main: #ffffff;
+  --text-muted: rgba(255, 255, 255, 0.6);
+  --key-bg: rgba(255, 255, 255, 0.1);
+  --key-text: #ffffff;
+  --key-active: rgba(255, 255, 255, 0.4);
+  --key-active-text: #000;
+}
+
+[data-theme='ocean'] {
+  /* Deep Ocean */
+  --bg-main: #0f172a;
+  --bg-card: #1e293b;
+  --border-main: #334155;
+  --text-main: #38bdf8;
+  --text-muted: #94a3b8;
+  --key-bg: #1e293b;
+  --key-text: #38bdf8;
+  --key-active: #0ea5e9;
+  --key-active-text: #fff;
+}
+
+[data-theme='sunset'] {
+  /* Sunset / Phantom Gradient Feel */
+  --bg-main: #2a0a2e;
+  --bg-card: rgba(88, 28, 135, 0.4);
+  --border-main: #c026d3;
+  --text-main: #f0abfc;
+  --text-muted: #c026d3;
+  --key-bg: rgba(88, 28, 135, 0.6);
+  --key-text: #f0abfc;
+  --key-active: #f472b6;
+  --key-active-text: #fff;
+}
+
+@layer base {
+  body {
+    @apply bg-slate-100 text-slate-900 antialiased dark:bg-slate-900 dark:text-slate-100;
+    font-family: 'Geom', sans-serif !important;
+  }
+}
+
+@layer utilities {
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0% {
+      transform: translateY(0px);
+    }
+
+    50% {
+      transform: translateY(-10px);
+    }
+
+    100% {
+      transform: translateY(0px);
+    }
+  }
+
+  /* 3D Perspective Utils */
+  .perspective-\[2000px\] {
+    perspective: 2000px;
+  }
+
+  .rotate-x-6 {
+    transform: rotateX(12deg);
+  }
+}
