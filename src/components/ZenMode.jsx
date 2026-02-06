@@ -1,0 +1,216 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useKeyboard } from '../context/KeyboardContext';
+import { useSound } from '../hooks/useSound';
+import { ZEN_CONTENT } from '../data/zenContent';
+import { ArrowCounterClockwise, CaretLeft } from 'phosphor-react';
+
+export function ZenMode({ onExit }) {
+    const { playClick } = useSound();
+    const [content, setContent] = useState(null);
+    const [input, setInput] = useState('');
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [isComplete, setIsComplete] = useState(false);
+
+    // --- Particle System ---
+    const particles = useRef([]);
+    const requestRef = useRef();
+
+    // Canvas Ref for Particles (Implementation coming next)
+    const canvasRef = useRef(null);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+
+        // Resize canvas to full window to catch all particles
+        const resize = () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        };
+        resize();
+        window.addEventListener('resize', resize);
+
+        const animate = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Update and draw particles
+            particles.current.forEach((p, index) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.02; // Decay
+                p.size *= 0.95; // Shrink
+
+                if (p.life <= 0 || p.size < 0.1) {
+                    particles.current.splice(index, 1);
+                } else {
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.life;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+
+            requestRef.current = requestAnimationFrame(animate);
+        };
+
+        requestRef.current = requestAnimationFrame(animate);
+
+        return () => {
+            window.removeEventListener('resize', resize);
+            cancelAnimationFrame(requestRef.current);
+        };
+    }, []);
+
+    // Initialize random content
+    useEffect(() => {
+        loadNewContent();
+    }, []);
+
+    const loadNewContent = () => {
+        const random = ZEN_CONTENT[Math.floor(Math.random() * ZEN_CONTENT.length)];
+        setContent(random);
+        setInput('');
+        setCurrentIndex(0);
+        setIsComplete(false);
+    };
+
+    const spawnParticles = (rect) => {
+        const count = 5 + Math.random() * 5; // 5-10 particles
+        // Get theme color from variable or default to Cyan
+        const computedStyle = getComputedStyle(document.documentElement);
+        // We can't easily get the explicit hex color if it's OKLCH in CSS var, 
+        // so we'll hardcode a "bright" fallback or try to read a safe var
+        // For now, let's use white/bright particles that take the tint of the theme potentially
+        // better: use a few predefined colors or white
+
+        for (let i = 0; i < count; i++) {
+            particles.current.push({
+                x: rect.left + rect.width / 2,
+                y: rect.top + rect.height / 2,
+                vx: (Math.random() - 0.5) * 4, // Random spread X
+                vy: (Math.random() - 1) * 4 - 2, // Upward trend
+                life: 1.0,
+                size: 2 + Math.random() * 3,
+                color: '#ffffff' // White particles work best on colored backgrounds
+            });
+        }
+    };
+
+    // Handle typing
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (isComplete) {
+                if (e.key === 'Enter') loadNewContent();
+                return;
+            }
+
+            // Ignore system keys
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            if (e.key.length > 1 && e.key !== 'Backspace') return;
+
+            if (e.key === 'Backspace') {
+                setInput(prev => prev.slice(0, -1));
+                setCurrentIndex(prev => Math.max(0, prev - 1));
+                playClick(8); // Backspace sound
+                return;
+            }
+
+            // Logic for correct/incorrect typing
+            const targetChar = content?.text[currentIndex];
+
+            if (e.key === targetChar) {
+                // Correct
+                setInput(prev => prev + e.key);
+                setCurrentIndex(prev => prev + 1);
+                playClick(e.key.charCodeAt(0));
+
+                // Trigger Particles
+                // We need to find the DOM element of the current character to know where to spawn
+                const charSpans = document.querySelectorAll(`[data-char-index="${currentIndex}"]`);
+                if (charSpans.length > 0) {
+                    const rect = charSpans[0].getBoundingClientRect();
+                    spawnParticles(rect);
+                }
+
+                if (currentIndex + 1 === content.text.length) {
+                    setIsComplete(true);
+                    playClick(1000); // Success sound (high pitch)
+                }
+            } else {
+                // Incorrect (Optional: Shake effect or error sound)
+                playClick(50); // Thud sound
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [content, currentIndex, isComplete, playClick]);
+
+    if (!content) return null;
+
+    return (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] relative z-10 w-full max-w-4xl mx-auto">
+
+            {/* Header / Exit */}
+            <div className="absolute -top-16 left-0 flex items-center gap-4">
+                <button
+                    onClick={onExit}
+                    className="flex items-center gap-2 text-skin-muted hover:text-skin-text transition-colors"
+                >
+                    <CaretLeft size={20} />
+                    <span className="font-mono text-sm">Exit Zen Mode</span>
+                </button>
+            </div>
+
+            {/* Particle Canvas Layer - Fixed to screen to handle absolute coords */}
+            <canvas
+                ref={canvasRef}
+                className="fixed inset-0 pointer-events-none z-50"
+            />
+
+            {/* Text Display */}
+            <div className="relative z-10 font-mono text-3xl md:text-4xl leading-relaxed text-center tracking-wide">
+                <div className="mb-4">
+                    {/* Render Character by Character */}
+                    {content.text.split('').map((char, i) => {
+                        let className = "transition-colors duration-100 ";
+                        if (i < currentIndex) {
+                            className += "text-skin-key-active drop-shadow-glow"; // Typed Correctly
+                        } else if (i === currentIndex) {
+                            className += "text-skin-text bg-skin-key-active/20 rounded px-1 animate-pulse"; // Current Cursor
+                        } else {
+                            className += "text-skin-muted opacity-30"; // Untyped
+                        }
+                        return (
+                            <span
+                                key={i}
+                                data-char-index={i}
+                                className={className}
+                            >
+                                {char}
+                            </span>
+                        );
+                    })}
+                </div>
+
+                <div className="mt-8 text-sm font-sans text-skin-muted uppercase tracking-widest opacity-60">
+                    — {content.author}
+                </div>
+            </div>
+
+            {/* Completion Message */}
+            {isComplete && (
+                <div className="mt-12 animate-in fade-in slide-in-from-bottom-4">
+                    <button
+                        onClick={loadNewContent}
+                        className="flex items-center gap-2 px-6 py-3 bg-skin-key-active text-skin-key-active-text rounded-full font-bold hover:scale-105 transition-transform shadow-lg shadow-skin-key-active/20"
+                    >
+                        <ArrowCounterClockwise size={20} />
+                        Next Quote (Enter)
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
