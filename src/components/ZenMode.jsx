@@ -63,9 +63,13 @@ export function ZenMode({ onExit }) {
     const getRandomContent = () => ZEN_CONTENT[Math.floor(Math.random() * ZEN_CONTENT.length)];
 
     // State for Rendering (View Only)
-    const [, setTick] = useState(0); // Force re-render
+    const [, setTick] = useState(0);
     const [isError, setIsError] = useState(false);
-    const [stats, setStats] = useState(null); // { wpm, time, accuracy }
+    const [stats, setStats] = useState(null);
+    const [combo, setCombo] = useState(0);
+    const [maxCombo, setMaxCombo] = useState(0);
+    const [level, setLevel] = useState(1);
+    const [quotesCompleted, setQuotesCompleted] = useState(0);
 
     // Refs for Logic (Source of Truth)
     const gameState = useRef({
@@ -74,7 +78,8 @@ export function ZenMode({ onExit }) {
         isComplete: false,
         startTime: null,
         errors: 0,
-        totalKeystrokes: 0
+        totalKeystrokes: 0,
+        currentCombo: 0
     });
 
     // Initial Sync for Render
@@ -85,41 +90,39 @@ export function ZenMode({ onExit }) {
     const loadNewContent = () => {
         const newContent = getRandomContent();
 
-        // Update Logic Immediate
         gameState.current = {
             content: newContent,
             currentIndex: 0,
             isComplete: false,
             startTime: null,
             errors: 0,
-            totalKeystrokes: 0
+            totalKeystrokes: 0,
+            currentCombo: 0
         };
 
+        // Keep Level/Quotes but reset session stats
         setStats(null);
         setIsError(false);
-        setTick(t => t + 1); // Trigger Render
+        setCombo(0);
+        setTick(t => t + 1);
     };
 
     const spawnParticles = (rect) => {
-        const count = 5 + Math.random() * 5;
+        // More particles for higher combos!
+        const comboMultiplier = Math.min(gameState.current.currentCombo / 10, 3);
+        const count = (5 + Math.random() * 5) + (comboMultiplier * 2);
 
-        // Dynamic Theme Color Extraction
-        const computedStyle = getComputedStyle(document.documentElement);
-        // We try to grab the key-active color, fallback to white
-        // Since we can't easily parse OKLCH/Variables in JS canvas without a helper, 
-        // we'll try to read the HEX if possible, or just default to a bright accent.
-        // For now, let's use a bright cyan/white mix which looks good on all dark themes.
-        const colors = ['#ffffff', '#38bdf8', '#f472b6', '#34d399'];
+        const colors = ['#ffffff', '#38bdf8', '#f472b6', '#34d399', '#facc15'];
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
 
         for (let i = 0; i < count; i++) {
             particles.current.push({
                 x: rect.left + rect.width / 2,
                 y: rect.top + rect.height / 2,
-                vx: (Math.random() - 0.5) * 4,
-                vy: (Math.random() - 1) * 4 - 2,
+                vx: (Math.random() - 0.5) * (4 + comboMultiplier),
+                vy: (Math.random() - 1) * (4 + comboMultiplier) - 2,
                 life: 1.0,
-                size: 2 + Math.random() * 3,
+                size: (2 + Math.random() * 3) + (comboMultiplier),
                 color: randomColor
             });
         }
@@ -130,7 +133,6 @@ export function ZenMode({ onExit }) {
         const handleKeyDown = (e) => {
             const state = gameState.current;
 
-            // Start Timer on first key
             if (!state.startTime && !state.isComplete) {
                 state.startTime = Date.now();
             }
@@ -140,17 +142,17 @@ export function ZenMode({ onExit }) {
                 return;
             }
 
-            // Ignore system keys (Cmd, Ctrl, etc.)
             if (e.ctrlKey || e.metaKey || e.altKey) return;
-            // Allow only single chars or Backspace
             if (e.key.length > 1 && e.key !== 'Backspace') return;
 
             e.preventDefault();
 
             if (e.key === 'Backspace') {
                 if (state.currentIndex > 0) {
-                    state.currentIndex--; // OPTIMISTIC UPDATE
-                    setTick(t => t + 1); // Trigger Render
+                    state.currentIndex--;
+                    state.currentCombo = 0; // Break combo on backspace
+                    setCombo(0); // Sync Render
+                    setTick(t => t + 1);
                     setIsError(false);
                     try { playClick('linear', 'Backspace'); } catch (err) { }
                 }
@@ -165,12 +167,19 @@ export function ZenMode({ onExit }) {
 
             if (isMatch) {
                 // Correct
-                state.currentIndex++; // OPTIMISTIC UPDATE
+                state.currentIndex++;
+                state.currentCombo++;
+                if (state.currentCombo > maxCombo) setMaxCombo(state.currentCombo);
+                setCombo(state.currentCombo); // Sync Render
+
                 setIsError(false);
-                setTick(t => t + 1); // Trigger Render
+                setTick(t => t + 1);
+
+                // Combo Pitch Scale? (Simple Implementation)
+                // const pitch = 1 + (Math.min(state.currentCombo, 20) / 40);
                 try { playClick('clicky', e.key.charCodeAt(0)); } catch (err) { }
 
-                // Particles (Spawn at previous index)
+                // Particles
                 const typedIndex = state.currentIndex - 1;
                 requestAnimationFrame(() => {
                     const charSpans = document.querySelectorAll(`[data-char-index="${typedIndex}"]`);
@@ -182,13 +191,13 @@ export function ZenMode({ onExit }) {
 
                 // Check Completion
                 if (state.currentIndex === state.content.text.length) {
-                    state.isComplete = true; // OPTIMISTIC UPDATE
+                    state.isComplete = true;
 
-                    // Calculate Stats
+                    // Stats
                     const endTime = Date.now();
                     const durationSeconds = (endTime - state.startTime) / 1000;
                     const minutes = durationSeconds / 60;
-                    const wpm = Math.round((state.content.text.length / 5) / (minutes || 0.01)); // Prevent divide by zero
+                    const wpm = Math.round((state.content.text.length / 5) / (minutes || 0.01));
                     const accuracy = Math.round(((state.totalKeystrokes - state.errors) / state.totalKeystrokes) * 100) || 100;
 
                     setStats({
@@ -197,12 +206,21 @@ export function ZenMode({ onExit }) {
                         accuracy: accuracy + '%'
                     });
 
+                    // Level Up Logic
+                    setQuotesCompleted(prev => {
+                        const newCount = prev + 1;
+                        if (newCount % 3 === 0) setLevel(l => l + 1); // Level up every 3 quotes
+                        return newCount;
+                    });
+
                     setTick(t => t + 1);
                     try { playClick('clicky', 1000); } catch (err) { }
                 }
             } else {
                 // Incorrect
                 state.errors++;
+                state.currentCombo = 0; // combo break
+                setCombo(0);
                 setIsError(true);
                 setTimeout(() => setIsError(false), 300);
                 try { playClick('linear', 50); } catch (err) { }
@@ -211,9 +229,7 @@ export function ZenMode({ onExit }) {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [playClick]);
-
-
+    }, [playClick]); // Keep playClick dep
 
     return (
         <div className="flex flex-col items-center justify-center min-h-[70vh] relative z-10 w-full max-w-5xl mx-auto">
@@ -228,19 +244,35 @@ export function ZenMode({ onExit }) {
                     <span className="font-mono text-sm">Exit Zen Mode</span>
                 </button>
 
-                {/* PERSISTENT STATS DASHBOARD */}
-                {stats && (
-                    <div className="flex gap-6 font-mono text-sm animate-in fade-in slide-in-from-right-8">
-                        <div className="flex flex-col items-end">
-                            <span className="text-[10px] text-skin-muted uppercase tracking-widest">WPM</span>
-                            <span className="text-skin-key-active font-bold text-lg">{stats.wpm}</span>
-                        </div>
-                        <div className="flex flex-col items-end">
-                            <span className="text-[10px] text-skin-muted uppercase tracking-widest">ACC</span>
-                            <span className={`font-bold text-lg ${parseInt(stats.accuracy) > 95 ? 'text-green-400' : 'text-yellow-400'}`}>{stats.accuracy}</span>
-                        </div>
+                {/* HUD: Level & Combo */}
+                <div className="flex items-center gap-8">
+                    <div className="flex flex-col items-center">
+                        <span className="text-[10px] text-skin-muted uppercase tracking-widest">Level</span>
+                        <span className="text-skin-text font-bold text-xl">{level}</span>
                     </div>
-                )}
+
+                    {/* Dynamic Combo Counter */}
+                    <div className={`flex flex-col items-center transition-all duration-100 ${combo > 5 ? 'scale-110' : 'scale-100'}`}>
+                        <span className="text-[10px] text-skin-muted uppercase tracking-widest">Combo</span>
+                        <span className={`font-bold text-xl transition-colors ${combo > 10 ? 'text-amber-400 animate-pulse' : combo > 5 ? 'text-skin-key-active' : 'text-skin-muted'}`}>
+                            {combo}x
+                        </span>
+                    </div>
+
+                    {/* Stats Dashboard (Only appears after 1 run) */}
+                    {stats && (
+                        <div className="flex gap-6 font-mono text-sm animate-in fade-in slide-in-from-right-8 border-l border-skin-border pl-8">
+                            <div className="flex flex-col items-end">
+                                <span className="text-[10px] text-skin-muted uppercase tracking-widest">WPM</span>
+                                <span className="text-skin-key-active font-bold text-lg">{stats.wpm}</span>
+                            </div>
+                            <div className="flex flex-col items-end">
+                                <span className="text-[10px] text-skin-muted uppercase tracking-widest">ACC</span>
+                                <span className="font-bold text-lg text-green-400">{stats.accuracy}</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Particle Canvas Loop */}
@@ -254,7 +286,7 @@ export function ZenMode({ onExit }) {
                 <div className="text-3xl md:text-5xl leading-tight text-center tracking-wide max-w-4xl mx-auto">
                     {/* Render Content */}
                     {content.text.split('').map((char, i) => {
-                        let className = "transition-all duration-75 inline-block "; // inline-block for transforms
+                        let className = "transition-all duration-75 inline-block ";
                         if (i < currentIndex) {
                             className += "text-skin-key-active drop-shadow-glow";
                         } else if (i === currentIndex) {
@@ -262,9 +294,13 @@ export function ZenMode({ onExit }) {
                         } else {
                             className += "text-skin-muted opacity-20";
                         }
+
+                        // Handle Space Rendering: Replace space with &nbsp; for visual persistence
+                        const displayChar = char === ' ' ? '\u00A0' : char;
+
                         return (
                             <span key={i} data-char-index={i} className={className}>
-                                {char}
+                                {displayChar}
                             </span>
                         );
                     })}
