@@ -97,6 +97,8 @@ export function ZenMode({ onExit }) {
         }
     };
 
+    const [isError, setIsError] = useState(false);
+
     // Handle typing
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -118,6 +120,7 @@ export function ZenMode({ onExit }) {
             if (e.key === 'Backspace') {
                 setInput(prev => prev.slice(0, -1));
                 setCurrentIndex(prev => Math.max(0, prev - 1));
+                setIsError(false); // Clear error on backspace
                 try { playClick('linear', 'Backspace'); } catch (err) { console.error("Audio Error:", err); }
                 return;
             }
@@ -130,6 +133,7 @@ export function ZenMode({ onExit }) {
                 // Correct
                 setInput(prev => prev + e.key);
                 setCurrentIndex(prev => prev + 1);
+                setIsError(false);
 
                 try { playClick('clicky', e.key.charCodeAt(0)); } catch (err) { console.error("Audio Error:", err); }
 
@@ -146,6 +150,8 @@ export function ZenMode({ onExit }) {
                 }
             } else {
                 // Incorrect
+                setIsError(true);
+                setTimeout(() => setIsError(false), 300); // Reset shake
                 try { playClick('linear', 50); } catch (err) { }
             }
         };
@@ -185,7 +191,8 @@ export function ZenMode({ onExit }) {
                         if (i < currentIndex) {
                             className += "text-skin-key-active drop-shadow-glow"; // Typed Correctly
                         } else if (i === currentIndex) {
-                            className += "text-skin-text bg-skin-key-active/20 rounded px-1 animate-pulse"; // Current Cursor
+                            // Current Cursor
+                            className += `text-skin-text bg-skin-key-active/20 rounded px-1 animate-pulse ${isError ? 'animate-shake text-rose-500 bg-rose-500/20' : ''}`;
                         } else {
                             className += "text-skin-muted opacity-30"; // Untyped
                         }
