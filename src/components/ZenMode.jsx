@@ -100,33 +100,40 @@ export function ZenMode({ onExit }) {
     // Handle typing
     useEffect(() => {
         const handleKeyDown = (e) => {
+            console.log('ZenMode Key:', e.key, 'Code:', e.code); // Debug Log
+
             if (isComplete) {
                 if (e.key === 'Enter') loadNewContent();
                 return;
             }
 
-            // Ignore system keys
+            // Ignore system keys (Cmd, Ctrl, etc.)
             if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+            // Allow only single chars or Backspace
             if (e.key.length > 1 && e.key !== 'Backspace') return;
+
+            e.preventDefault(); // Prevent scrolling/navigation for valid game keys
 
             if (e.key === 'Backspace') {
                 setInput(prev => prev.slice(0, -1));
                 setCurrentIndex(prev => Math.max(0, prev - 1));
-                playClick(8); // Backspace sound
+                try { playClick('linear', 'Backspace'); } catch (err) { console.error("Audio Error:", err); }
                 return;
             }
 
             // Logic for correct/incorrect typing
             const targetChar = content?.text[currentIndex];
+            console.log('Target:', targetChar, 'Input:', e.key); // Debug Match
 
             if (e.key === targetChar) {
                 // Correct
                 setInput(prev => prev + e.key);
                 setCurrentIndex(prev => prev + 1);
-                playClick(e.key.charCodeAt(0));
+
+                try { playClick('clicky', e.key.charCodeAt(0)); } catch (err) { console.error("Audio Error:", err); }
 
                 // Trigger Particles
-                // We need to find the DOM element of the current character to know where to spawn
                 const charSpans = document.querySelectorAll(`[data-char-index="${currentIndex}"]`);
                 if (charSpans.length > 0) {
                     const rect = charSpans[0].getBoundingClientRect();
@@ -135,11 +142,11 @@ export function ZenMode({ onExit }) {
 
                 if (currentIndex + 1 === content.text.length) {
                     setIsComplete(true);
-                    playClick(1000); // Success sound (high pitch)
+                    try { playClick('clicky', 1000); } catch (err) { }
                 }
             } else {
-                // Incorrect (Optional: Shake effect or error sound)
-                playClick(50); // Thud sound
+                // Incorrect
+                try { playClick('linear', 50); } catch (err) { }
             }
         };
 
