@@ -62,40 +62,34 @@ export function ZenMode({ onExit }) {
     // Initialize random content synchronously to avoid null render
     const getRandomContent = () => ZEN_CONTENT[Math.floor(Math.random() * ZEN_CONTENT.length)];
 
-    // State for Rendering
-    const [content, setContent] = useState(getRandomContent);
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [isComplete, setIsComplete] = useState(false);
+    // State for Rendering (View Only)
+    const [, setTick] = useState(0); // Force re-render
     const [isError, setIsError] = useState(false);
-    const [, setTick] = useState(0); // Force re-render if needed
 
-    // Refs for Logic (Avoids Stale Closures)
+    // Refs for Logic (Source of Truth)
     const gameState = useRef({
-        content: content,
+        content: getRandomContent(),
         currentIndex: 0,
         isComplete: false
     });
 
-    // Update refs when state changes
-    useEffect(() => {
-        gameState.current.content = content;
-        gameState.current.currentIndex = currentIndex;
-        gameState.current.isComplete = isComplete;
-    }, [content, currentIndex, isComplete]);
+    // Initial Sync for Render
+    const content = gameState.current.content;
+    const currentIndex = gameState.current.currentIndex;
+    const isComplete = gameState.current.isComplete;
 
     const loadNewContent = () => {
         const newContent = getRandomContent();
-        setContent(newContent);
-        setCurrentIndex(0);
-        setIsComplete(false);
-        setIsError(false);
 
-        // Update refs immediately for any sync events
+        // Update Logic Immediate
         gameState.current = {
             content: newContent,
             currentIndex: 0,
             isComplete: false
         };
+
+        setIsError(false);
+        setTick(t => t + 1); // Trigger Render
     };
 
     const spawnParticles = (rect) => {
@@ -124,7 +118,7 @@ export function ZenMode({ onExit }) {
     useEffect(() => {
         const handleKeyDown = (e) => {
             const state = gameState.current;
-            console.log('[Zen] Key:', e.key, 'Expected:', state.content?.text[state.currentIndex]);
+            console.log('[Zen] RefState Index:', state.currentIndex, 'Key:', e.key);
 
             if (state.isComplete) {
                 if (e.key === 'Enter') loadNewContent();
@@ -139,7 +133,8 @@ export function ZenMode({ onExit }) {
 
             if (e.key === 'Backspace') {
                 if (state.currentIndex > 0) {
-                    setCurrentIndex(prev => prev - 1);
+                    state.currentIndex--; // OPTIMISTIC UPDATE
+                    setTick(t => t + 1); // Trigger Render
                     setIsError(false);
                     try { playClick('linear', 'Backspace'); } catch (err) { }
                 }
@@ -151,20 +146,36 @@ export function ZenMode({ onExit }) {
 
             if (e.key === targetChar) {
                 // Correct
-                setCurrentIndex(prev => prev + 1);
+                state.currentIndex++; // OPTIMISTIC UPDATE
                 setIsError(false);
+                setTick(t => t + 1); // Trigger Render
                 try { playClick('clicky', e.key.charCodeAt(0)); } catch (err) { }
 
-                // Particles
-                const charSpans = document.querySelectorAll(`[data-char-index="${state.currentIndex}"]`);
-                if (charSpans.length > 0) {
-                    const rect = charSpans[0].getBoundingClientRect();
-                    spawnParticles(rect);
-                }
+                // Particles (Use new index - 1 because we just incremented)
+                // Actually, we want to spawn at the character we just typed.
+                // But React hasn't rendered yet, so the DOM rect for index is still valid?
+                // Wait, if we incremented, the DOM node for the *new* current index is "active".
+                // The DOM node for the *typed* char (index - 1) is what we want.
+
+                // Let's spawn on the PREVIOUS index (the one we just matched)
+                // Since state.currentIndex is now N, we want N-1
+                const typedIndex = state.currentIndex - 1;
+
+                // Since DOM hasn't updated, the span for typedIndex is still there. 
+                // We need to requestAnimationFrame or just query it? 
+                // Querying effectively gets the position.
+                requestAnimationFrame(() => {
+                    const charSpans = document.querySelectorAll(`[data-char-index="${typedIndex}"]`);
+                    if (charSpans.length > 0) {
+                        const rect = charSpans[0].getBoundingClientRect();
+                        spawnParticles(rect);
+                    }
+                });
 
                 // Check Completion
-                if (state.currentIndex + 1 === state.content.text.length) {
-                    setIsComplete(true);
+                if (state.currentIndex === state.content.text.length) {
+                    state.isComplete = true; // OPTIMISTIC UPDATE
+                    setTick(t => t + 1);
                     try { playClick('clicky', 1000); } catch (err) { }
                 }
             } else {
@@ -177,7 +188,7 @@ export function ZenMode({ onExit }) {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [playClick]); // Only re-bind if playClick changes (which it shouldn't)
+    }, [playClick]);
 
 
 
