@@ -62,17 +62,40 @@ export function ZenMode({ onExit }) {
     // Initialize random content synchronously to avoid null render
     const getRandomContent = () => ZEN_CONTENT[Math.floor(Math.random() * ZEN_CONTENT.length)];
 
-    // State
+    // State for Rendering
     const [content, setContent] = useState(getRandomContent);
-    const [input, setInput] = useState('');
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isComplete, setIsComplete] = useState(false);
+    const [isError, setIsError] = useState(false);
+    const [, setTick] = useState(0); // Force re-render if needed
+
+    // Refs for Logic (Avoids Stale Closures)
+    const gameState = useRef({
+        content: content,
+        currentIndex: 0,
+        isComplete: false
+    });
+
+    // Update refs when state changes
+    useEffect(() => {
+        gameState.current.content = content;
+        gameState.current.currentIndex = currentIndex;
+        gameState.current.isComplete = isComplete;
+    }, [content, currentIndex, isComplete]);
 
     const loadNewContent = () => {
-        setContent(getRandomContent());
-        setInput('');
+        const newContent = getRandomContent();
+        setContent(newContent);
         setCurrentIndex(0);
         setIsComplete(false);
+        setIsError(false);
+
+        // Update refs immediately for any sync events
+        gameState.current = {
+            content: newContent,
+            currentIndex: 0,
+            isComplete: false
+        };
     };
 
     const spawnParticles = (rect) => {
@@ -97,68 +120,64 @@ export function ZenMode({ onExit }) {
         }
     };
 
-    const [isError, setIsError] = useState(false);
-
-    // Handle typing
+    // Handle typing (Bound Once)
     useEffect(() => {
         const handleKeyDown = (e) => {
-            console.log('ZenMode Key:', e.key, 'Code:', e.code); // Debug Log
+            const state = gameState.current;
+            console.log('[Zen] Key:', e.key, 'Expected:', state.content?.text[state.currentIndex]);
 
-            if (isComplete) {
+            if (state.isComplete) {
                 if (e.key === 'Enter') loadNewContent();
                 return;
             }
 
-            // Ignore system keys (Cmd, Ctrl, etc.)
+            // Ignore system keys
             if (e.ctrlKey || e.metaKey || e.altKey) return;
-
-            // Allow only single chars or Backspace
             if (e.key.length > 1 && e.key !== 'Backspace') return;
 
-            e.preventDefault(); // Prevent scrolling/navigation for valid game keys
+            e.preventDefault();
 
             if (e.key === 'Backspace') {
-                setInput(prev => prev.slice(0, -1));
-                setCurrentIndex(prev => Math.max(0, prev - 1));
-                setIsError(false); // Clear error on backspace
-                try { playClick('linear', 'Backspace'); } catch (err) { console.error("Audio Error:", err); }
+                if (state.currentIndex > 0) {
+                    setCurrentIndex(prev => prev - 1);
+                    setIsError(false);
+                    try { playClick('linear', 'Backspace'); } catch (err) { }
+                }
                 return;
             }
 
-            // Logic for correct/incorrect typing
-            const targetChar = content?.text[currentIndex];
-            console.log('Target:', targetChar, 'Input:', e.key); // Debug Match
+            // Logic
+            const targetChar = state.content?.text[state.currentIndex];
 
             if (e.key === targetChar) {
                 // Correct
-                setInput(prev => prev + e.key);
                 setCurrentIndex(prev => prev + 1);
                 setIsError(false);
+                try { playClick('clicky', e.key.charCodeAt(0)); } catch (err) { }
 
-                try { playClick('clicky', e.key.charCodeAt(0)); } catch (err) { console.error("Audio Error:", err); }
-
-                // Trigger Particles
-                const charSpans = document.querySelectorAll(`[data-char-index="${currentIndex}"]`);
+                // Particles
+                const charSpans = document.querySelectorAll(`[data-char-index="${state.currentIndex}"]`);
                 if (charSpans.length > 0) {
                     const rect = charSpans[0].getBoundingClientRect();
                     spawnParticles(rect);
                 }
 
-                if (currentIndex + 1 === content.text.length) {
+                // Check Completion
+                if (state.currentIndex + 1 === state.content.text.length) {
                     setIsComplete(true);
                     try { playClick('clicky', 1000); } catch (err) { }
                 }
             } else {
                 // Incorrect
                 setIsError(true);
-                setTimeout(() => setIsError(false), 300); // Reset shake
+                setTimeout(() => setIsError(false), 300);
                 try { playClick('linear', 50); } catch (err) { }
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [content, currentIndex, isComplete, playClick]);
+    }, [playClick]); // Only re-bind if playClick changes (which it shouldn't)
 
 
 
