@@ -216,10 +216,10 @@ export function ZenMode({ onExit }) {
 
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] relative z-10 w-full max-w-4xl mx-auto">
+        <div className="flex flex-col items-center justify-center min-h-[70vh] relative z-10 w-full max-w-5xl mx-auto">
 
             {/* Header / Exit */}
-            <div className="absolute -top-16 left-0 flex items-center gap-4">
+            <div className="absolute -top-20 left-4 md:left-0 flex items-center justify-between w-full">
                 <button
                     onClick={onExit}
                     className="flex items-center gap-2 text-skin-muted hover:text-skin-text transition-colors"
@@ -227,73 +227,65 @@ export function ZenMode({ onExit }) {
                     <CaretLeft size={20} />
                     <span className="font-mono text-sm">Exit Zen Mode</span>
                 </button>
-                {/* Live Stats Preview? Maybe later. Keep minimal. */}
+
+                {/* PERSISTENT STATS DASHBOARD */}
+                {stats && (
+                    <div className="flex gap-6 font-mono text-sm animate-in fade-in slide-in-from-right-8">
+                        <div className="flex flex-col items-end">
+                            <span className="text-[10px] text-skin-muted uppercase tracking-widest">WPM</span>
+                            <span className="text-skin-key-active font-bold text-lg">{stats.wpm}</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                            <span className="text-[10px] text-skin-muted uppercase tracking-widest">ACC</span>
+                            <span className={`font-bold text-lg ${parseInt(stats.accuracy) > 95 ? 'text-green-400' : 'text-yellow-400'}`}>{stats.accuracy}</span>
+                        </div>
+                    </div>
+                )}
             </div>
 
-            {/* Particle Canvas Layer - Fixed to screen to handle absolute coords */}
+            {/* Particle Canvas Loop */}
             <canvas
                 ref={canvasRef}
                 className="fixed inset-0 pointer-events-none z-50"
             />
 
-            {/* Text Display */}
-            {!isComplete ? (
-                <div className="relative z-10 font-mono text-3xl md:text-4xl leading-relaxed text-center tracking-wide">
-                    <div className="mb-4">
-                        {/* Render Character by Character */}
-                        {content.text.split('').map((char, i) => {
-                            let className = "transition-colors duration-100 ";
-                            if (i < currentIndex) {
-                                className += "text-skin-key-active drop-shadow-glow"; // Typed Correctly
-                            } else if (i === currentIndex) {
-                                // Current Cursor
-                                className += `text-skin-text bg-skin-key-active/20 rounded px-1 animate-pulse ${isError ? 'animate-shake text-rose-500 bg-rose-500/20' : ''}`;
-                            } else {
-                                className += "text-skin-muted opacity-30"; // Untyped
-                            }
-                            return (
-                                <span
-                                    key={i}
-                                    data-char-index={i}
-                                    className={className}
-                                >
-                                    {char}
-                                </span>
-                            );
-                        })}
-                    </div>
+            {/* Main Game Area */}
+            <div className={`relative z-10 font-mono transition-all duration-500 ${isComplete ? 'scale-95 opacity-50 blur-[2px]' : 'scale-100 opacity-100'}`}>
+                <div className="text-3xl md:text-5xl leading-tight text-center tracking-wide max-w-4xl mx-auto">
+                    {/* Render Content */}
+                    {content.text.split('').map((char, i) => {
+                        let className = "transition-all duration-75 inline-block "; // inline-block for transforms
+                        if (i < currentIndex) {
+                            className += "text-skin-key-active drop-shadow-glow";
+                        } else if (i === currentIndex) {
+                            className += `text-skin-text bg-skin-key-active/20 rounded px-1 animate-pulse ${isError ? 'animate-shake text-rose-500 bg-rose-500/20' : ''}`;
+                        } else {
+                            className += "text-skin-muted opacity-20";
+                        }
+                        return (
+                            <span key={i} data-char-index={i} className={className}>
+                                {char}
+                            </span>
+                        );
+                    })}
+                </div>
 
-                    <div className="mt-8 text-sm font-sans text-skin-muted uppercase tracking-widest opacity-60">
+                <div className="mt-8 text-center">
+                    <div className="text-sm font-sans text-skin-muted uppercase tracking-widest opacity-60">
                         — {content.author}
                     </div>
                 </div>
-            ) : (
-                /* RESULTS CARD */
-                <div className="animate-in fade-in zoom-in duration-500 bg-skin-card backdrop-blur-xl border border-skin-border p-8 rounded-2xl shadow-2xl text-center max-w-md w-full">
-                    <h2 className="text-2xl font-bold text-skin-text mb-6">Zen Complete</h2>
+            </div>
 
-                    <div className="grid grid-cols-3 gap-4 mb-8">
-                        <div className="flex flex-col">
-                            <span className="text-sm text-skin-muted uppercase tracking-wider">WPM</span>
-                            <span className="text-4xl font-mono text-skin-key-active font-bold">{stats?.wpm || 0}</span>
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-sm text-skin-muted uppercase tracking-wider">Time</span>
-                            <span className="text-4xl font-mono text-skin-text font-bold">{stats?.time || '0s'}</span>
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-sm text-skin-muted uppercase tracking-wider">Accuracy</span>
-                            <span className="text-4xl font-mono text-green-400 font-bold">{stats?.accuracy || '0%'}</span>
-                        </div>
+            {/* INLINE COMPLETION PROMPT */}
+            {isComplete && (
+                <div className="absolute bottom-20 flex flex-col items-center animate-in fade-in slide-in-from-bottom-8">
+                    <div className="text-skin-key-active font-mono text-xl mb-2 font-bold tracking-widest">
+                        SECTION COMPLETE
                     </div>
-
-                    <button
-                        onClick={loadNewContent}
-                        className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-skin-key-active text-skin-key-active-text rounded-xl font-bold text-lg hover:scale-105 transition-transform shadow-lg shadow-skin-key-active/20"
-                    >
-                        <ArrowCounterClockwise size={24} weight="bold" />
-                        Next Challenge (Enter)
-                    </button>
+                    <div className="text-skin-muted text-sm flex items-center gap-2 animate-pulse">
+                        Press <span className="border border-skin-muted px-2 py-0.5 rounded text-xs">Enter</span> to continue
+                    </div>
                 </div>
             )}
         </div>
