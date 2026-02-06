@@ -6,20 +6,17 @@ import { ArrowCounterClockwise, CaretLeft } from 'phosphor-react';
 
 export function ZenMode({ onExit }) {
     const { playClick } = useSound();
-    const [content, setContent] = useState(null);
-    const [input, setInput] = useState('');
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [isComplete, setIsComplete] = useState(false);
-
     // --- Particle System ---
     const particles = useRef([]);
     const requestRef = useRef();
 
-    // Canvas Ref for Particles (Implementation coming next)
+    // Canvas Ref for Particles
     const canvasRef = useRef(null);
 
     useEffect(() => {
         const canvas = canvasRef.current;
+        if (!canvas) return; // Guard against null canvas
+
         const ctx = canvas.getContext('2d');
 
         // Resize canvas to full window to catch all particles
@@ -62,14 +59,17 @@ export function ZenMode({ onExit }) {
         };
     }, []);
 
-    // Initialize random content
-    useEffect(() => {
-        loadNewContent();
-    }, []);
+    // Initialize random content synchronously to avoid null render
+    const getRandomContent = () => ZEN_CONTENT[Math.floor(Math.random() * ZEN_CONTENT.length)];
+
+    // State
+    const [content, setContent] = useState(getRandomContent);
+    const [input, setInput] = useState('');
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [isComplete, setIsComplete] = useState(false);
 
     const loadNewContent = () => {
-        const random = ZEN_CONTENT[Math.floor(Math.random() * ZEN_CONTENT.length)];
-        setContent(random);
+        setContent(getRandomContent());
         setInput('');
         setCurrentIndex(0);
         setIsComplete(false);
@@ -147,7 +147,7 @@ export function ZenMode({ onExit }) {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [content, currentIndex, isComplete, playClick]);
 
-    if (!content) return null;
+
 
     return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] relative z-10 w-full max-w-4xl mx-auto">
