@@ -260,10 +260,15 @@ export function ZenMode({ onExit }) {
                 <div>Index: {currentIndex}</div>
                 <div>Target: "{content.text[currentIndex]}"</div>
                 <div>Target Code: {content.text.charCodeAt(currentIndex)}</div>
-                <div>Last Key: {input.slice(-1)}</div>
                 <div>IsError: {isError ? 'YES' : 'NO'}</div>
                 <div>Complete: {isComplete ? 'YES' : 'NO'}</div>
                 <div>Tick: {gameState.current.currentIndex} (Ref)</div>
+                <div className="text-yellow-400 mt-2">
+                    {/* Helper for Case Sensitivity */}
+                    {content.text[currentIndex] && content.text[currentIndex].toUpperCase() !== content.text[currentIndex].toLowerCase() && (
+                        content.text[currentIndex] === content.text[currentIndex].toUpperCase() ? "SHIFT Required" : ""
+                    )}
+                </div>
             </div>
         </div>
     );
