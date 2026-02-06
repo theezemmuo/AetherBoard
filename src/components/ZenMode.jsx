@@ -255,6 +255,16 @@ export function ZenMode({ onExit }) {
                     </button>
                 </div>
             )}
+            {/* DEBUG OVERLAY */}
+            <div className="fixed top-20 left-4 bg-black/80 text-green-400 p-4 font-mono text-xs rounded z-[100] border border-green-500/30">
+                <div>Index: {currentIndex}</div>
+                <div>Target: "{content.text[currentIndex]}"</div>
+                <div>Target Code: {content.text.charCodeAt(currentIndex)}</div>
+                <div>Last Key: {input.slice(-1)}</div>
+                <div>IsError: {isError ? 'YES' : 'NO'}</div>
+                <div>Complete: {isComplete ? 'YES' : 'NO'}</div>
+                <div>Tick: {gameState.current.currentIndex} (Ref)</div>
+            </div>
         </div>
     );
 }
