@@ -2,11 +2,13 @@ import { useEffect } from 'react';
 import { useKeyboard } from '../context/KeyboardContext';
 import { useSound } from './useSound';
 
-export function useHardwareEvents() {
+export function useHardwareEvents({ enabled = true } = {}) {
     const { markKeyPressed, markKeyReleased, clearTested } = useKeyboard();
     const { playClick } = useSound();
 
     useEffect(() => {
+        if (!enabled) return;
+
         const handleKeyDown = (e) => {
             e.preventDefault();
 
