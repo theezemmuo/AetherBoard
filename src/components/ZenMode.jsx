@@ -65,12 +65,16 @@ export function ZenMode({ onExit }) {
     // State for Rendering (View Only)
     const [, setTick] = useState(0); // Force re-render
     const [isError, setIsError] = useState(false);
+    const [stats, setStats] = useState(null); // { wpm, time, accuracy }
 
     // Refs for Logic (Source of Truth)
     const gameState = useRef({
         content: getRandomContent(),
         currentIndex: 0,
-        isComplete: false
+        isComplete: false,
+        startTime: null,
+        errors: 0,
+        totalKeystrokes: 0
     });
 
     // Initial Sync for Render
@@ -85,31 +89,38 @@ export function ZenMode({ onExit }) {
         gameState.current = {
             content: newContent,
             currentIndex: 0,
-            isComplete: false
+            isComplete: false,
+            startTime: null,
+            errors: 0,
+            totalKeystrokes: 0
         };
 
+        setStats(null);
         setIsError(false);
         setTick(t => t + 1); // Trigger Render
     };
 
     const spawnParticles = (rect) => {
-        const count = 5 + Math.random() * 5; // 5-10 particles
-        // Get theme color from variable or default to Cyan
+        const count = 5 + Math.random() * 5;
+
+        // Dynamic Theme Color Extraction
         const computedStyle = getComputedStyle(document.documentElement);
-        // We can't easily get the explicit hex color if it's OKLCH in CSS var, 
-        // so we'll hardcode a "bright" fallback or try to read a safe var
-        // For now, let's use white/bright particles that take the tint of the theme potentially
-        // better: use a few predefined colors or white
+        // We try to grab the key-active color, fallback to white
+        // Since we can't easily parse OKLCH/Variables in JS canvas without a helper, 
+        // we'll try to read the HEX if possible, or just default to a bright accent.
+        // For now, let's use a bright cyan/white mix which looks good on all dark themes.
+        const colors = ['#ffffff', '#38bdf8', '#f472b6', '#34d399'];
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
 
         for (let i = 0; i < count; i++) {
             particles.current.push({
                 x: rect.left + rect.width / 2,
                 y: rect.top + rect.height / 2,
-                vx: (Math.random() - 0.5) * 4, // Random spread X
-                vy: (Math.random() - 1) * 4 - 2, // Upward trend
+                vx: (Math.random() - 0.5) * 4,
+                vy: (Math.random() - 1) * 4 - 2,
                 life: 1.0,
                 size: 2 + Math.random() * 3,
-                color: '#ffffff' // White particles work best on colored backgrounds
+                color: randomColor
             });
         }
     };
@@ -118,15 +129,20 @@ export function ZenMode({ onExit }) {
     useEffect(() => {
         const handleKeyDown = (e) => {
             const state = gameState.current;
-            console.log('[Zen] RefState Index:', state.currentIndex, 'Key:', e.key);
+
+            // Start Timer on first key
+            if (!state.startTime && !state.isComplete) {
+                state.startTime = Date.now();
+            }
 
             if (state.isComplete) {
                 if (e.key === 'Enter') loadNewContent();
                 return;
             }
 
-            // Ignore system keys
+            // Ignore system keys (Cmd, Ctrl, etc.)
             if (e.ctrlKey || e.metaKey || e.altKey) return;
+            // Allow only single chars or Backspace
             if (e.key.length > 1 && e.key !== 'Backspace') return;
 
             e.preventDefault();
@@ -141,29 +157,21 @@ export function ZenMode({ onExit }) {
                 return;
             }
 
-            // Logic
-            const targetChar = state.content?.text[state.currentIndex];
+            state.totalKeystrokes++;
 
-            if (e.key === targetChar) {
+            // Logic (Case Insensitive)
+            const targetChar = state.content?.text[state.currentIndex];
+            const isMatch = e.key.toLowerCase() === targetChar.toLowerCase();
+
+            if (isMatch) {
                 // Correct
                 state.currentIndex++; // OPTIMISTIC UPDATE
                 setIsError(false);
                 setTick(t => t + 1); // Trigger Render
                 try { playClick('clicky', e.key.charCodeAt(0)); } catch (err) { }
 
-                // Particles (Use new index - 1 because we just incremented)
-                // Actually, we want to spawn at the character we just typed.
-                // But React hasn't rendered yet, so the DOM rect for index is still valid?
-                // Wait, if we incremented, the DOM node for the *new* current index is "active".
-                // The DOM node for the *typed* char (index - 1) is what we want.
-
-                // Let's spawn on the PREVIOUS index (the one we just matched)
-                // Since state.currentIndex is now N, we want N-1
+                // Particles (Spawn at previous index)
                 const typedIndex = state.currentIndex - 1;
-
-                // Since DOM hasn't updated, the span for typedIndex is still there. 
-                // We need to requestAnimationFrame or just query it? 
-                // Querying effectively gets the position.
                 requestAnimationFrame(() => {
                     const charSpans = document.querySelectorAll(`[data-char-index="${typedIndex}"]`);
                     if (charSpans.length > 0) {
@@ -175,11 +183,26 @@ export function ZenMode({ onExit }) {
                 // Check Completion
                 if (state.currentIndex === state.content.text.length) {
                     state.isComplete = true; // OPTIMISTIC UPDATE
+
+                    // Calculate Stats
+                    const endTime = Date.now();
+                    const durationSeconds = (endTime - state.startTime) / 1000;
+                    const minutes = durationSeconds / 60;
+                    const wpm = Math.round((state.content.text.length / 5) / (minutes || 0.01)); // Prevent divide by zero
+                    const accuracy = Math.round(((state.totalKeystrokes - state.errors) / state.totalKeystrokes) * 100) || 100;
+
+                    setStats({
+                        wpm: wpm > 0 ? wpm : 0,
+                        time: durationSeconds.toFixed(1) + 's',
+                        accuracy: accuracy + '%'
+                    });
+
                     setTick(t => t + 1);
                     try { playClick('clicky', 1000); } catch (err) { }
                 }
             } else {
                 // Incorrect
+                state.errors++;
                 setIsError(true);
                 setTimeout(() => setIsError(false), 300);
                 try { playClick('linear', 50); } catch (err) { }
@@ -204,6 +227,7 @@ export function ZenMode({ onExit }) {
                     <CaretLeft size={20} />
                     <span className="font-mono text-sm">Exit Zen Mode</span>
                 </button>
+                {/* Live Stats Preview? Maybe later. Keep minimal. */}
             </div>
 
             {/* Particle Canvas Layer - Fixed to screen to handle absolute coords */}
@@ -213,63 +237,65 @@ export function ZenMode({ onExit }) {
             />
 
             {/* Text Display */}
-            <div className="relative z-10 font-mono text-3xl md:text-4xl leading-relaxed text-center tracking-wide">
-                <div className="mb-4">
-                    {/* Render Character by Character */}
-                    {content.text.split('').map((char, i) => {
-                        let className = "transition-colors duration-100 ";
-                        if (i < currentIndex) {
-                            className += "text-skin-key-active drop-shadow-glow"; // Typed Correctly
-                        } else if (i === currentIndex) {
-                            // Current Cursor
-                            className += `text-skin-text bg-skin-key-active/20 rounded px-1 animate-pulse ${isError ? 'animate-shake text-rose-500 bg-rose-500/20' : ''}`;
-                        } else {
-                            className += "text-skin-muted opacity-30"; // Untyped
-                        }
-                        return (
-                            <span
-                                key={i}
-                                data-char-index={i}
-                                className={className}
-                            >
-                                {char}
-                            </span>
-                        );
-                    })}
-                </div>
+            {!isComplete ? (
+                <div className="relative z-10 font-mono text-3xl md:text-4xl leading-relaxed text-center tracking-wide">
+                    <div className="mb-4">
+                        {/* Render Character by Character */}
+                        {content.text.split('').map((char, i) => {
+                            let className = "transition-colors duration-100 ";
+                            if (i < currentIndex) {
+                                className += "text-skin-key-active drop-shadow-glow"; // Typed Correctly
+                            } else if (i === currentIndex) {
+                                // Current Cursor
+                                className += `text-skin-text bg-skin-key-active/20 rounded px-1 animate-pulse ${isError ? 'animate-shake text-rose-500 bg-rose-500/20' : ''}`;
+                            } else {
+                                className += "text-skin-muted opacity-30"; // Untyped
+                            }
+                            return (
+                                <span
+                                    key={i}
+                                    data-char-index={i}
+                                    className={className}
+                                >
+                                    {char}
+                                </span>
+                            );
+                        })}
+                    </div>
 
-                <div className="mt-8 text-sm font-sans text-skin-muted uppercase tracking-widest opacity-60">
-                    — {content.author}
+                    <div className="mt-8 text-sm font-sans text-skin-muted uppercase tracking-widest opacity-60">
+                        — {content.author}
+                    </div>
                 </div>
-            </div>
+            ) : (
+                /* RESULTS CARD */
+                <div className="animate-in fade-in zoom-in duration-500 bg-skin-card backdrop-blur-xl border border-skin-border p-8 rounded-2xl shadow-2xl text-center max-w-md w-full">
+                    <h2 className="text-2xl font-bold text-skin-text mb-6">Zen Complete</h2>
 
-            {/* Completion Message */}
-            {isComplete && (
-                <div className="mt-12 animate-in fade-in slide-in-from-bottom-4">
+                    <div className="grid grid-cols-3 gap-4 mb-8">
+                        <div className="flex flex-col">
+                            <span className="text-sm text-skin-muted uppercase tracking-wider">WPM</span>
+                            <span className="text-4xl font-mono text-skin-key-active font-bold">{stats?.wpm || 0}</span>
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-sm text-skin-muted uppercase tracking-wider">Time</span>
+                            <span className="text-4xl font-mono text-skin-text font-bold">{stats?.time || '0s'}</span>
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-sm text-skin-muted uppercase tracking-wider">Accuracy</span>
+                            <span className="text-4xl font-mono text-green-400 font-bold">{stats?.accuracy || '0%'}</span>
+                        </div>
+                    </div>
+
                     <button
                         onClick={loadNewContent}
-                        className="flex items-center gap-2 px-6 py-3 bg-skin-key-active text-skin-key-active-text rounded-full font-bold hover:scale-105 transition-transform shadow-lg shadow-skin-key-active/20"
+                        className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-skin-key-active text-skin-key-active-text rounded-xl font-bold text-lg hover:scale-105 transition-transform shadow-lg shadow-skin-key-active/20"
                     >
-                        <ArrowCounterClockwise size={20} />
-                        Next Quote (Enter)
+                        <ArrowCounterClockwise size={24} weight="bold" />
+                        Next Challenge (Enter)
                     </button>
                 </div>
             )}
-            {/* DEBUG OVERLAY */}
-            <div className="fixed top-20 left-4 bg-black/80 text-green-400 p-4 font-mono text-xs rounded z-[100] border border-green-500/30">
-                <div>Index: {currentIndex}</div>
-                <div>Target: "{content.text[currentIndex]}"</div>
-                <div>Target Code: {content.text.charCodeAt(currentIndex)}</div>
-                <div>IsError: {isError ? 'YES' : 'NO'}</div>
-                <div>Complete: {isComplete ? 'YES' : 'NO'}</div>
-                <div>Tick: {gameState.current.currentIndex} (Ref)</div>
-                <div className="text-yellow-400 mt-2">
-                    {/* Helper for Case Sensitivity */}
-                    {content.text[currentIndex] && content.text[currentIndex].toUpperCase() !== content.text[currentIndex].toLowerCase() && (
-                        content.text[currentIndex] === content.text[currentIndex].toUpperCase() ? "SHIFT Required" : ""
-                    )}
-                </div>
-            </div>
         </div>
     );
 }
